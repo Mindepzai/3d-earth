@@ -3,72 +3,196 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mô Phỏng Hệ Mặt Trời Phản Hồi</title>
+    <title>Mô Phỏng Hệ Mặt Trời 3D - Phiên bản Tối ưu</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Thư viện Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
-    <!-- Post-Processing dependencies for Bloom Effect (Cần thiết cho hiệu ứng phát sáng) -->
+    <!-- Post-Processing dependencies for Bloom Effect (Cần cho Mặt Trời tỏa sáng) -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/Pass.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
-    
-    <!-- Các Shader cần thiết cho UnrealBloomPass -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/ConvolutionShader.js"></script>
-    
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
-    
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    
     <style>
-        /* Đảm bảo canvas chiếm toàn bộ khu vực xem và được căn giữa */
+        /* Tối ưu hóa CSS cho di động và máy tính */
         body {
             margin: 0;
             overflow: hidden; 
             background-color: #0d1117;
             font-family: 'Inter', sans-serif;
             color: white;
+            touch-action: none; /* Ngăn chặn hành vi mặc định của trình duyệt */
         }
         canvas {
             display: block;
         }
-        #controls {
+        
+        #controls, #info-panel {
             position: absolute;
-            top: 1rem;
-            left: 1rem;
-            padding: 0.5rem; /* Giảm padding cho mobile */
-            background: rgba(17, 24, 39, 0.7); 
-            border-radius: 8px;
+            padding: 0.75rem;
+            background: rgba(17, 24, 39, 0.85);
+            border-radius: 12px;
             z-index: 100;
             user-select: none;
             border: 1px solid rgba(55, 65, 81, 0.5);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+            max-height: 90vh; /* Giới hạn chiều cao trên mọi thiết bị */
+            overflow-y: auto;
+            transition: all 0.3s ease;
         }
+
+        #controls {
+            top: 1rem;
+            left: 1rem;
+            width: 250px;
+            max-width: 90vw;
+        }
+
+        #info-panel {
+            top: 1rem;
+            right: 1rem;
+            width: 300px;
+            max-width: 90vw;
+            display: none;
+        }
+        
         .btn {
-            padding: 0.5rem 0.5rem; /* Tinh chỉnh nút cho mobile */
-            border-radius: 6px;
+            padding: 0.6rem 0.75rem;
+            border-radius: 8px;
             font-weight: 600;
             cursor: pointer;
-            transition: background-color 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            line-height: 1; /* Cố định chiều cao */
-            font-size: 1.5rem; /* Kích thước emoji lớn hơn */
+            transition: background-color 0.2s, transform 0.1s;
+            line-height: 1; 
+            font-size: 0.95rem;
+        }
+        .btn:active {
+            transform: scale(0.98);
+        }
+        
+        /* Tùy chỉnh thanh trượt */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #374151;
+            border-radius: 4px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #10b981;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
+        }
+        
+        #planet-list {
+            max-height: 300px;
+            overflow-y: auto;
+            /* Thêm scrollbar style cho đẹp hơn */
+            scrollbar-width: thin;
+            scrollbar-color: #4b5563 #111827; 
+        }
+
+        #planet-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        #planet-list::-webkit-scrollbar-thumb {
+            background-color: #4b5563;
+            border-radius: 4px;
+        }
+        #planet-list::-webkit-scrollbar-track {
+            background: #111827;
+        }
+
+        .planet-item {
+            padding: 0.5rem;
+            margin-bottom: 0.25rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.15s;
+            font-size: 0.875rem;
+        }
+        .planet-item:hover {
+            background-color: rgba(55, 65, 81, 0.5);
+        }
+        .planet-item.active {
+            background-color: #3b82f6;
+            font-weight: bold;
+        }
+        
+        #llm-loading, #llm-response {
+            font-style: italic;
         }
     </style>
 </head>
 <body>
-    <!-- Bảng điều khiển mới -->
+    <!-- Bảng điều khiển (Tốc độ và Danh sách) -->
     <div id="controls">
-        <button id="focusEarthBtn" class="btn bg-blue-600 hover:bg-blue-700 text-white shadow-lg">
-            <span role="img" aria-label="Tập trung vào Trái Đất">🌎</span>
-        </button>
+        <h2 class="text-lg font-bold text-blue-400 mb-3 border-b border-gray-700 pb-1">Điều khiển Mô phỏng</h2>
+        
+        <!-- Thanh điều khiển tốc độ -->
+        <div class="control-group mb-4">
+            <label for="speedSlider" class="text-sm font-medium text-gray-300">Tốc độ Mô phỏng: <span id="currentSpeed">1.0</span>x</label>
+            <input type="range" id="speedSlider" min="0.1" max="5.0" step="0.1" value="1.0">
+        </div>
+        
+        <!-- Danh sách chọn hành tinh -->
+        <div class="control-group">
+            <label class="text-sm font-medium text-gray-300 mb-2 block">Tập trung Camera</label>
+            <div id="planet-list" class="bg-gray-800/70 p-1 rounded-lg">
+                <!-- Danh sách hành tinh được chèn bằng JS -->
+            </div>
+        </div>
     </div>
 
+    <!-- Bảng thông tin Hành tinh -->
+    <div id="info-panel">
+        <h2 id="planet-name-title" class="text-xl font-bold mb-3 border-b border-gray-600 pb-2 text-yellow-300">Thông tin Hành tinh</h2>
+        <div id="planet-details" class="text-sm space-y-2">
+            <p class="info-detail">Tên: <strong id="info-name"></strong></p>
+            <p class="info-detail">Kích thước (Rel.): <strong id="info-size"></strong></p>
+            <p class="info-detail">Bán kính Quỹ đạo (Rel.): <strong id="info-orbit"></strong></p>
+            <p class="info-detail">Khoảng cách đến MT (Tức thời): <strong id="info-distance" class="text-green-400"></strong></p>
+            <p class="info-detail">Tốc độ Quỹ đạo: <strong id="info-speed"></strong></p>
+        </div>
+
+        <button id="get-llm-info" class="btn bg-indigo-600 hover:bg-indigo-700 text-white w-full mt-4">
+            Tìm hiểu thêm về Hành tinh này
+        </button>
+
+        <p id="llm-loading" class="mt-3 text-center text-sm">Đang tải thông tin từ Gemini/Google Search...</p>
+        <div id="llm-response" class="hidden mt-3 p-3 rounded-lg bg-gray-700/60 text-sm"></div>
+        <p id="llm-sources" class="text-xs text-gray-400 mt-2"></p>
+    </div>
+    
+    <!-- Overlay Hướng dẫn -->
+    <div id="help-overlay" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[200] transition-opacity duration-500">
+        <div class="bg-gray-900 p-6 rounded-xl shadow-2xl max-w-sm mx-4 border border-blue-700">
+            <h3 class="text-2xl font-extrabold text-blue-400 mb-4">Khám phá Hệ Mặt Trời 🪐</h3>
+            <ul class="text-sm space-y-3 text-gray-300">
+                <li><strong class="text-white">Di chuyển/Quay:</strong> Giữ chuột trái (PC) hoặc chạm và kéo (Mobile) để xoay camera.</li>
+                <li><strong class="text-white">Zoom:</strong> Cuộn chuột (PC) hoặc dùng hai ngón tay chụm/tách (Mobile).</li>
+                <li><strong class="text-white">Tập trung:</strong> Nhấn vào tên hành tinh trong menu hoặc nhấn trực tiếp vào hành tinh.</li>
+                <li><strong class="text-red-400">Chấm đỏ:</strong> Biểu thị vị trí của bạn trên Trái Đất (chỉ hiện khi zoom gần).</li>
+            </ul>
+            <button id="close-help" class="btn bg-blue-600 hover:bg-blue-700 text-white w-full mt-5">
+                Bắt đầu khám phá
+            </button>
+        </div>
+    </div>
+
+
     <script>
-        // Các biến toàn cục
+        // === KHAI BÁO BIẾN TOÀN CỤC ===
         let scene = null;
         let camera = null;
         let renderer = null;
@@ -76,69 +200,301 @@
         let clock = null;
         let solarSystemObjects = []; 
         let asteroids = null; 
+        let moon = null;
+        let earthClouds = null;
+        let globalSpeedMultiplier = 1.0; 
         
-        // Các biến cho điều khiển camera bằng chuột/cảm ứng
         let isDragging = false;
         let previousMousePosition = { x: 0, y: 0 };
         let cameraRadius = 1300; 
         let cameraAngle = { horizontal: 0, vertical: 0.4 }; 
         let focusTarget = new THREE.Vector3(0, 0, 0); 
+        let currentFocusObject = null; 
+        let initialPinchDistance = 0; 
+        
+        let focusIndicator = null; // Vòng sáng bao quanh hành tinh đang focus
+        
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        
+        const INITIAL_SPEED_FACTOR = 0.5;
 
-        // Dữ liệu hành tinh (Giữ nguyên các cải tiến trước)
+        // Tọa độ người trên Trái Đất (Đại diện cho Hà Nội, Việt Nam - Latitude: 21.0285, Longitude: 105.8542)
+        const HANOI_LATITUDE = 21.0285;
+        const HANOI_LONGITUDE = 105.8542;
+        let earth = null;
+        let earthAnnotation = null; 
+        const ANNOTATION_DISTANCE_THRESHOLD = 50; // Camera radius để hiển thị chấm đỏ
+
+        // Dữ liệu Hành tinh (Đã chỉnh sửa thông số để mô phỏng tốt hơn)
         const PLANET_DATA = [
-            // Name, Size (Radius), Orbit Radius, Orbit Speed, Self Rotate Speed, Color, Emissive, Inclination, Ring Color, Axial Tilt
-            { name: 'Sun', size: 15, color: 0xffffff, emissive: 0xfdd45c, orbitRadius: 0, orbitSpeed: 0, selfRotateSpeed: 0.05, inclination: 0 }, 
-            { name: 'Mercury', size: 1.0, color: 0x808080, orbitRadius: 30, orbitSpeed: 1.5, selfRotateSpeed: 0.1, inclination: 7 * (Math.PI / 180) },
-            { name: 'Venus', size: 2.5, color: 0xd2b48c, orbitRadius: 55, orbitSpeed: 1.0, selfRotateSpeed: 0.05, inclination: 3.4 * (Math.PI / 180) },
-            { name: 'Earth', size: 3, color: 0x0088ff, orbitRadius: 90, orbitSpeed: 0.5, selfRotateSpeed: 0.5, hasMoon: true, inclination: 0.0 * (Math.PI / 180) }, 
-            { name: 'Mars', size: 1.5, color: 0xa0522d, orbitRadius: 130, orbitSpeed: 0.4, selfRotateSpeed: 0.8, inclination: 1.8 * (Math.PI / 180) },
-            { name: 'Jupiter', size: 8, color: 0xd3a373, orbitRadius: 250, orbitSpeed: 0.2, selfRotateSpeed: 1.5, inclination: 1.3 * (Math.PI / 180) },
-            { name: 'Saturn', size: 6, color: 0xf5deb3, orbitRadius: 400, orbitSpeed: 0.15, selfRotateSpeed: 1.2, hasRings: true, inclination: 2.5 * (Math.PI / 180), ringColor: 0x776655, axialTilt: 0.4 * Math.PI / 2 },
-            { name: 'Uranus', size: 4, color: 0xafdfe4, orbitRadius: 650, orbitSpeed: 0.1, selfRotateSpeed: 0.8, hasRings: true, inclination: 0.77 * (Math.PI / 180), ringColor: 0xeeeeff, axialTilt: 98 * (Math.PI / 180) },
-            { name: 'Neptune', size: 4, color: 0x00008b, orbitRadius: 900, orbitSpeed: 0.07, selfRotateSpeed: 0.7, inclination: 1.8 * (Math.PI / 180) },
-            { name: 'Pluto', size: 0.5, color: 0xcccccc, orbitRadius: 1150, orbitSpeed: 0.03, selfRotateSpeed: 0.05, inclination: 17 * (Math.PI / 180) },
+            { name: 'Sun', size: 15, color: 0xffffff, emissive: 0xfdd45c, orbitRadius: 0, orbitSpeed: 0 * INITIAL_SPEED_FACTOR, selfRotateSpeed: 0.05 * INITIAL_SPEED_FACTOR, inclination: 0 }, 
+            { name: 'Mercury', size: 1.0, color: 0x808080, orbitRadius: 30, orbitSpeed: 1.5 * INITIAL_SPEED_FACTOR, selfRotateSpeed: 0.1 * INITIAL_SPEED_FACTOR, inclination: 7 * (Math.PI / 180) },
+            { name: 'Venus', size: 2.5, color: 0xd2b48c, orbitRadius: 55, orbitSpeed: 1.0 * INITIAL_SPEED_FACTOR, selfRotateSpeed: 0.05 * INITIAL_SPEED_FACTOR, inclination: 3.4 * (Math.PI / 180) },
+            { name: 'Earth', size: 3, color: 0x0088ff, orbitRadius: 90, orbitSpeed: 0.5 * INITIAL_SPEED_FACTOR, selfRotateSpeed: 0.5 * INITIAL_SPEED_FACTOR, hasMoon: true, inclination: 0.0 * (Math.PI / 180) }, 
+            { name: 'Mars', size: 1.5, color: 0xa0522d, orbitRadius: 130, orbitSpeed: 0.4 * INITIAL_SPEED_FACTOR, selfRotateSpeed: 0.8 * INITIAL_SPEED_FACTOR, inclination: 1.8 * (Math.PI / 180) },
+            { name: 'Jupiter', size: 8, color: 0xd3a373, orbitRadius: 250, orbitSpeed: 0.2 * INITIAL_SPEED_FACTOR, selfRotateSpeed: 1.5 * INITIAL_SPEED_FACTOR, inclination: 1.3 * (Math.PI / 180) },
+            { name: 'Saturn', size: 6, color: 0xf5deb3, orbitRadius: 400, orbitSpeed: 0.15 * INITIAL_SPEED_FACTOR, selfRotateSpeed: 1.2 * INITIAL_SPEED_FACTOR, hasRings: true, inclination: 2.5 * (Math.PI / 180), ringColor: 0x776655, axialTilt: 26.7 * (Math.PI / 180) }, 
+            { name: 'Uranus', size: 4, color: 0xafdfe4, orbitRadius: 650, orbitSpeed: 0.1 * INITIAL_SPEED_FACTOR, selfRotateSpeed: 0.8 * INITIAL_SPEED_FACTOR, hasRings: true, inclination: 0.77 * (Math.PI / 180), ringColor: 0xeeeeff, axialTilt: 98 * (Math.PI / 180) },
+            { name: 'Neptune', size: 4, color: 0x00008b, orbitRadius: 900, orbitSpeed: 0.07 * INITIAL_SPEED_FACTOR, selfRotateSpeed: 0.7 * INITIAL_SPEED_FACTOR, inclination: 1.8 * (Math.PI / 180) },
+            { name: 'Pluto', size: 0.5, color: 0xcccccc, orbitRadius: 1150, orbitSpeed: 0.03 * INITIAL_SPEED_FACTOR, selfRotateSpeed: 0.05 * INITIAL_SPEED_FACTOR, inclination: 17 * (Math.PI / 180) },
         ];
         
-        let earth = null;
-        let moon = null;
-        let earthClouds = null; 
+        // === CÁC HÀM XỬ LÝ LLM (GENERATIVE API) ===
 
+        function createGeminiPayload(query, systemPrompt = "") {
+            const contents = [{ parts: [{ text: query }] }];
+            const payload = {
+                contents: contents,
+                tools: [{ "google_search": {} }],
+            };
+            
+            if (systemPrompt) {
+                payload.systemInstruction = { parts: [{ text: systemPrompt }] };
+            }
+
+            return payload;
+        }
+
+        async function fetchPlanetInfo(planetName) {
+            const loading = document.getElementById('llm-loading');
+            const responseDiv = document.getElementById('llm-response');
+            const sourcesDiv = document.getElementById('llm-sources');
+            const button = document.getElementById('get-llm-info');
+
+            loading.style.display = 'block';
+            responseDiv.style.display = 'none';
+            responseDiv.innerHTML = '';
+            sourcesDiv.innerHTML = '';
+            button.disabled = true;
+
+            const systemPrompt = "Bạn là một nhà khoa học vũ trụ, tóm tắt thông tin quan trọng về hành tinh này. Viết một đoạn văn ngắn gọn, thân thiện, bằng tiếng Việt, tập trung vào các đặc điểm độc đáo và thông tin thú vị nhất. Không sử dụng markdown, tiêu đề, hoặc ký tự đặc biệt.";
+            const userQuery = `Tìm thông tin chi tiết về Hành tinh ${planetName} (ví dụ: nhiệt độ, thành phần, đặc điểm nổi bật) và tóm tắt.`;
+            
+            const apiKey = "" 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            const payload = createGeminiPayload(userQuery, systemPrompt);
+            
+            let maxRetries = 3;
+            let delay = 1000;
+
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.status === 429 && i < maxRetries - 1) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2; 
+                        continue;
+                    }
+                    
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                    const result = await response.json();
+                    const candidate = result.candidates?.[0];
+
+                    if (candidate && candidate.content?.parts?.[0]?.text) {
+                        const text = candidate.content.parts[0].text;
+                        responseDiv.innerHTML = text;
+                        responseDiv.style.display = 'block';
+
+                        let sources = [];
+                        const groundingMetadata = candidate.groundingMetadata;
+                        if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                            sources = groundingMetadata.groundingAttributions
+                                .map(attr => attr.web?.title)
+                                .filter(title => title); 
+                            
+                            if (sources.length > 0) {
+                                sourcesDiv.innerHTML = 'Nguồn: ' + sources.join(', ');
+                            }
+                        }
+                    } else {
+                         responseDiv.innerHTML = 'Không tìm thấy thông tin chi tiết. Vui lòng thử lại.';
+                         responseDiv.style.display = 'block';
+                    }
+                    
+                    break; 
+
+                } catch (error) {
+                    console.error("Lỗi khi gọi API Gemini:", error);
+                    if (i === maxRetries - 1) {
+                         responseDiv.innerHTML = 'Lỗi kết nối. Không thể tìm thấy thông tin.';
+                         responseDiv.style.display = 'block';
+                    }
+                } finally {
+                    loading.style.display = 'none';
+                    button.disabled = false;
+                }
+            }
+        }
+
+
+        // === CÁC HÀM XỬ LÝ 3D & UI ===
 
         /**
-         * Cập nhật vị trí camera dựa trên tọa độ cực
+         * Thêm hoặc cập nhật vòng sáng focus xung quanh hành tinh
+         */
+        function updateFocusIndicator() {
+            // Xóa indicator cũ khỏi hành tinh cũ (nếu có)
+            if (focusIndicator) {
+                focusIndicator.parent.remove(focusIndicator);
+                focusIndicator.geometry.dispose();
+                focusIndicator.material.dispose();
+                focusIndicator = null;
+            }
+
+            if (currentFocusObject && currentFocusObject.userData.name !== 'Sun') {
+                const size = currentFocusObject.userData.size;
+                
+                // Tạo một vòng sáng mờ quanh hành tinh đang focus
+                const indicatorGeometry = new THREE.RingGeometry(size * 1.5, size * 1.6, 64);
+                const indicatorMaterial = new THREE.MeshBasicMaterial({ 
+                    color: 0xffa500, // Màu cam/vàng
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.35,
+                    depthWrite: false, // Giúp nó luôn hiển thị
+                    blending: THREE.AdditiveBlending 
+                });
+
+                focusIndicator = new THREE.Mesh(indicatorGeometry, indicatorMaterial);
+                focusIndicator.rotation.x = Math.PI / 2; // Làm phẳng
+                focusIndicator.name = "FocusIndicator";
+
+                currentFocusObject.add(focusIndicator);
+            }
+        }
+
+        /**
+         * Cập nhật thông tin trên bảng Info Panel
+         */
+        function updateInfoPanel(data) {
+            const panel = document.getElementById('info-panel');
+            const nameTitle = document.getElementById('planet-name-title');
+            const infoName = document.getElementById('info-name');
+            const infoSize = document.getElementById('info-size');
+            const infoOrbit = document.getElementById('info-orbit');
+            const infoSpeed = document.getElementById('info-speed');
+            const infoDistance = document.getElementById('info-distance'); // NEW
+            const getInfoButton = document.getElementById('get-llm-info');
+            
+            // Xóa thông tin LLM cũ
+            document.getElementById('llm-response').innerHTML = '';
+            document.getElementById('llm-response').style.display = 'none';
+            document.getElementById('llm-sources').innerHTML = '';
+            document.getElementById('llm-loading').style.display = 'none';
+
+            if (!data) {
+                panel.style.display = 'none';
+                return;
+            }
+
+            panel.style.display = 'block';
+            nameTitle.textContent = data.name;
+            infoName.textContent = data.name;
+            infoSize.textContent = `${data.size.toFixed(1)} đơn vị`;
+            infoOrbit.textContent = `${data.orbitRadius.toFixed(1)} AU (mô phỏng)`;
+            infoSpeed.textContent = `${(data.orbitSpeed / INITIAL_SPEED_FACTOR).toFixed(2)} đơn vị/s`;
+            
+            if (data.name === 'Sun') {
+                 infoDistance.textContent = '0.00 AU';
+                 getInfoButton.textContent = 'Tìm hiểu thêm về Mặt Trời';
+                 getInfoButton.onclick = () => fetchPlanetInfo('Mặt Trời');
+            } else {
+                 infoDistance.textContent = 'Đang tính...';
+                 getInfoButton.textContent = `Tìm hiểu thêm về ${data.name}`;
+                 getInfoButton.onclick = () => fetchPlanetInfo(data.name);
+            }
+        }
+
+        /**
+         * Thiết lập camera tập trung vào một đối tượng hành tinh
+         */
+        function focusOnObject(targetObject) {
+            if (!targetObject || targetObject.userData.name === 'Sun') {
+                // Focus Mặt Trời (Toàn cảnh)
+                currentFocusObject = null;
+                focusTarget.set(0, 0, 0); 
+                cameraRadius = 1300; 
+                updateInfoPanel(PLANET_DATA.find(p => p.name === 'Sun'));
+                updatePlanetListUI('Sun');
+                updateFocusIndicator();
+                return;
+            }
+
+            currentFocusObject = targetObject;
+            
+            // Đặt bán kính camera zoom dựa trên kích thước hành tinh
+            const baseDistance = targetObject.userData.size * 6; 
+            cameraRadius = Math.max(10, baseDistance); 
+            
+            // Đặt góc camera hơi chéo để nhìn đẹp hơn
+            cameraAngle = { horizontal: 0.2, vertical: 0.3 };
+            
+            updateInfoPanel(targetObject.userData);
+            updatePlanetListUI(targetObject.userData.name);
+            updateFocusIndicator(); // Thêm vòng sáng focus
+        }
+
+        /**
+         * Cập nhật vị trí camera dựa trên tọa độ cực và mục tiêu focusTarget
          */
         function updateCameraPosition() {
             if (!camera) return;
             const maxVerticalAngle = Math.PI / 180 * 85;
             cameraAngle.vertical = Math.max(-maxVerticalAngle, Math.min(maxVerticalAngle, cameraAngle.vertical));
 
-            const x = cameraRadius * Math.cos(cameraAngle.vertical) * Math.sin(cameraAngle.horizontal);
-            const y = cameraRadius * Math.sin(cameraAngle.vertical);
-            const z = cameraRadius * Math.cos(cameraAngle.vertical) * Math.cos(cameraAngle.horizontal);
+            const x = focusTarget.x + cameraRadius * Math.cos(cameraAngle.vertical) * Math.sin(cameraAngle.horizontal);
+            const y = focusTarget.y + cameraRadius * Math.sin(cameraAngle.vertical);
+            const z = focusTarget.z + cameraRadius * Math.cos(cameraAngle.vertical) * Math.cos(cameraAngle.horizontal);
             
             camera.position.set(x, y, z);
             camera.lookAt(focusTarget); 
+            
+            // Điều chỉnh hiển thị Annotation based on camera distance (NEW)
+            if (earthAnnotation) {
+                // Chỉ hiển thị chấm đỏ khi camera đủ gần Trái Đất (tương đương zoom vào Trái Đất)
+                const isEarthFocused = currentFocusObject && currentFocusObject.userData.name === 'Earth';
+                earthAnnotation.visible = isEarthFocused && cameraRadius < ANNOTATION_DISTANCE_THRESHOLD;
+            }
         }
 
         /**
-         * Chức năng tập trung camera vào Trái Đất (mượt mà)
+         * Tạo dấu chấm đại diện cho vị trí con người (Annotation) trên Trái Đất
          */
-        function focusOnEarth() {
+        function createEarthAnnotation() {
             if (!earth) return;
-            const earthPosition = new THREE.Vector3();
-            earth.getWorldPosition(earthPosition);
 
-            // Thiết lập vị trí mới
-            focusTarget.copy(earthPosition); 
-            cameraRadius = 150; 
-            cameraAngle = { horizontal: 0.2, vertical: 0.3 }; 
-            updateCameraPosition();
+            const radius = earth.userData.size + 0.05; 
+            const latRad = HANOI_LATITUDE * (Math.PI / 180);
+            const lonRad = HANOI_LONGITUDE * (Math.PI / 180);
+
+            // Chuyển đổi tọa độ cầu sang Cartesian (căn chỉnh với mô hình Three.js mặc định quay quanh Y)
+            const x = radius * Math.cos(latRad) * Math.sin(lonRad);
+            const y = radius * Math.sin(latRad);
+            const z = radius * Math.cos(latRad) * Math.cos(lonRad);
+            
+            const geometry = new THREE.SphereGeometry(0.15, 16, 16); 
+            const material = new THREE.MeshBasicMaterial({ 
+                color: 0xff0000, 
+                transparent: true, 
+                opacity: 0.9, 
+                depthTest: false // Đảm bảo luôn hiển thị trên bề mặt 
+            }); 
+            
+            earthAnnotation = new THREE.Mesh(geometry, material);
+            earthAnnotation.position.set(x, y, z);
+            earthAnnotation.name = "HumanAnnotation";
+            earthAnnotation.visible = false; // Ban đầu ẩn
+            earth.add(earthAnnotation);
         }
 
-
-        /**
-         * Tạo nền sao (Starfield)
-         */
+        // Tạo nền sao
         function createStars() {
             const starGeometry = new THREE.BufferGeometry();
             const starVertices = []; 
@@ -154,15 +510,13 @@
 
             starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
             
-            const starMaterial = new THREE.PointsMaterial({ color: 0xeeeeff, size: 0.8, sizeAttenuation: true });
+            const starMaterial = new THREE.PointsMaterial({ color: 0xeeeeff, size: 0.4, sizeAttenuation: true }); 
             
             const stars = new THREE.Points(starGeometry, starMaterial);
             scene.add(stars);
         }
 
-        /**
-         * Tạo Vành đai Tiểu hành tinh
-         */
+        // Tạo Vành đai Tiểu hành tinh
         function createAsteroidBelt() {
             const asteroidCount = 8000; 
             const beltInnerRadius = 150;
@@ -193,36 +547,59 @@
             geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
             
             asteroids = new THREE.Points(geometry, material);
-            asteroids.userData.orbitSpeed = 0.3; 
+            asteroids.userData.orbitSpeed = 0.3 * INITIAL_SPEED_FACTOR; 
             scene.add(asteroids);
         }
 
-        /**
-         * Lấy vật liệu dựa trên loại hành tinh (PBR settings)
-         */
+        // Lấy vật liệu dựa trên loại hành tinh (PBR settings)
         function getPlanetMaterial(data) {
             let roughness = 0.8;
             let metalness = 0.2;
             let color = data.color;
-
-            const name = data.name;
-
-            if (['Mercury', 'Mars', 'Pluto'].includes(name)) {
-                roughness = 1.0;
-                metalness = 0.05;
-            } else if (['Venus', 'Jupiter', 'Saturn', 'Uranus', 'Neptune'].includes(name)) {
-                roughness = 0.7;
-                metalness = 0.1;
-            } else if (name === 'Earth') {
-                color = 0x1f5f9f; 
-                roughness = 0.8; 
-                metalness = 0.0;
-            }
-
+            
             return new THREE.MeshStandardMaterial({ 
                 color: color, 
                 roughness: roughness, 
                 metalness: metalness 
+            });
+        }
+        
+        // Tạo danh sách hành tinh trên UI
+        function createPlanetList() {
+            const list = document.getElementById('planet-list');
+            list.innerHTML = '';
+            
+            const sunData = PLANET_DATA.find(p => p.name === 'Sun');
+            let item = document.createElement('div');
+            item.className = 'planet-item active';
+            item.textContent = '☀️ Mặt Trời (Toàn cảnh)';
+            item.dataset.planet = 'Sun';
+            list.appendChild(item);
+            
+            PLANET_DATA.filter(p => p.name !== 'Sun').forEach(data => {
+                let item = document.createElement('div');
+                item.className = 'planet-item';
+                item.textContent = data.name + (data.name === 'Earth' ? ' 🌍' : '');
+                item.dataset.planet = data.name;
+                list.appendChild(item);
+            });
+            
+            list.addEventListener('click', (event) => {
+                const planetName = event.target.dataset.planet;
+                if (planetName) {
+                    const targetObject = solarSystemObjects.find(obj => obj.userData.name === planetName);
+                    focusOnObject(targetObject);
+                }
+            });
+        }
+        
+        // Cập nhật trạng thái active trong danh sách UI
+        function updatePlanetListUI(name) {
+             document.querySelectorAll('.planet-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.planet === name) {
+                    item.classList.add('active');
+                }
             });
         }
 
@@ -231,29 +608,23 @@
          * Thiết lập cảnh 3D ban đầu
          */
         function init() {
-            console.log("Khởi tạo Three.js...");
-
-            // 1. Scene (Cảnh)
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x0a0a0a); 
 
-            // 2. Camera (Máy ảnh)
             const aspectRatio = window.innerWidth / window.innerHeight;
             camera = new THREE.PerspectiveCamera(60, aspectRatio, 0.1, 4000); 
+            focusOnObject(null); // Focus ban đầu vào Mặt Trời
             updateCameraPosition(); 
             
-            // 3. Renderer (Bộ hiển thị)
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.shadowMap.enabled = true; 
             renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
             document.body.appendChild(renderer.domElement);
             
-            // 4. Composer (Hiệu ứng hậu kỳ) - THÊM HIỆU ỨNG BLOOM
+            // Thiết lập Post-Processing cho hiệu ứng Bloom
             composer = new THREE.EffectComposer(renderer);
             composer.addPass(new THREE.RenderPass(scene, camera));
-
-            // Thêm hiệu ứng Bloom (Phát sáng) 
             const bloomPass = new THREE.UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
                 1.5, // strength
@@ -263,14 +634,13 @@
             bloomPass.strength = 1.5; 
             composer.addPass(bloomPass);
 
-            // 5. Clock (Đồng hồ)
             clock = new THREE.Clock();
 
-            // 6. Light (Ánh sáng)
+            // Ánh sáng môi trường (Ambient)
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.1); 
             scene.add(ambientLight);
 
-            // Ánh sáng điểm từ Mặt Trời (Nguồn sáng chính)
+            // Ánh sáng điểm (Point Light) tại vị trí Mặt Trời
             const pointLight = new THREE.PointLight(0xffffff, 3.0, 3000); 
             pointLight.position.set(0, 0, 0);
             pointLight.castShadow = true; 
@@ -280,14 +650,10 @@
             pointLight.shadow.camera.far = 1500; 
             scene.add(pointLight);
 
-            // Tạo nền sao và Vành đai tiểu hành tinh
             createStars();
             createAsteroidBelt();
 
-
-            // 7. Objects (Các đối tượng)
-            
-            // Tạo Mặt Trời
+            // Tạo Mặt Trời (Sun)
             const sunData = PLANET_DATA.find(p => p.name === 'Sun');
             const sunGeometry = new THREE.SphereGeometry(sunData.size, 64, 64);
             const sunMaterial = new THREE.MeshStandardMaterial({ 
@@ -297,44 +663,38 @@
             });
             const sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
             sunMesh.userData = sunData;
+            sunMesh.name = sunData.name;
             scene.add(sunMesh);
             solarSystemObjects.push(sunMesh); 
             
-            // --- Cải tiến đồ họa: Thêm Quầng Sáng (Corona) cho Mặt Trời ---
+            // Vòng Corona/Hào quang Mặt Trời (cho hiệu ứng thị giác)
             const coronaGeometry = new THREE.SphereGeometry(sunData.size * 1.5, 32, 32);
             const coronaMaterial = new THREE.MeshBasicMaterial({
-                color: 0xfdd45c, // Màu vàng cam
-                transparent: true,
-                opacity: 0.1, // Rất mỏng
-                depthWrite: false, // Không ghi vào depth buffer
-                blending: THREE.AdditiveBlending, // Tăng cường độ sáng
+                color: 0xfdd45c, transparent: true, opacity: 0.1, depthWrite: false, blending: THREE.AdditiveBlending, 
             });
             const coronaMesh = new THREE.Mesh(coronaGeometry, coronaMaterial);
             sunMesh.add(coronaMesh);
-            // --- Kết thúc Corona ---
 
 
             // Tạo các Hành tinh
             for (const data of PLANET_DATA) {
                 if (data.name === 'Sun') continue;
 
-                // 1. Tạo Group (Quỹ đạo)
+                // Group cho Quỹ đạo (để dễ dàng đặt độ nghiêng quỹ đạo)
                 const orbitGroup = new THREE.Group();
                 if (data.inclination) {
                     orbitGroup.rotation.z = data.inclination;
                 }
                 scene.add(orbitGroup);
 
-                // 2. Tạo Hành tinh (Mesh)
                 const geometry = new THREE.SphereGeometry(data.size, 64, 64);
-                
                 const material = getPlanetMaterial(data); 
-                
                 const planetMesh = new THREE.Mesh(geometry, material);
                 
                 planetMesh.position.x = data.orbitRadius;
                 planetMesh.receiveShadow = true; 
                 planetMesh.castShadow = true;   
+                planetMesh.name = data.name; 
 
                 planetMesh.userData = data;
                 orbitGroup.add(planetMesh);
@@ -343,117 +703,62 @@
 
                 if (data.name === 'Earth') {
                     earth = planetMesh;
+                    createEarthAnnotation(); 
 
-                    // Bầu khí quyển
                     const atmosphereGeometry = new THREE.SphereGeometry(data.size * 1.05, 64, 64); 
                     const atmosphereMaterial = new THREE.MeshStandardMaterial({
-                        color: 0x9fdeff, 
-                        transparent: true,
-                        opacity: 0.15, 
-                        depthWrite: false, 
-                        side: THREE.BackSide 
+                        color: 0x9fdeff, transparent: true, opacity: 0.15, depthWrite: false, side: THREE.BackSide 
                     });
                     const atmosphereMesh = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
                     planetMesh.add(atmosphereMesh); 
                     atmosphereMesh.receiveShadow = true;
                     
-                    // Mây
                     const cloudsGeometry = new THREE.SphereGeometry(data.size * 1.005, 64, 64); 
                     const cloudsMaterial = new THREE.MeshBasicMaterial({
-                        color: 0xffffff, 
-                        transparent: true,
-                        opacity: 0.35, 
-                        wireframe: true, 
-                        wireframeLinewidth: 0.2 
+                        color: 0xffffff, transparent: true, opacity: 0.35, wireframe: true, wireframeLinewidth: 0.2 
                     });
                     earthClouds = new THREE.Mesh(cloudsGeometry, cloudsMaterial);
                     planetMesh.add(earthClouds);
                 }
                 
-                // Vân Sọc & Vết Đỏ Lớn cho Sao Mộc (Jupiter)
-                if (data.name === 'Jupiter') {
-                    const radius = data.size;
-                    const bandCount = 8;
-                    const bandColors = [0xe8e4c0, 0xddc9a0, 0xaf9d75]; 
-
-                    for (let i = 0; i < bandCount; i++) {
-                        const bandColor = bandColors[i % bandColors.length];
-                        const bandGeometry = new THREE.CylinderGeometry(radius * 1.005, radius * 1.005, radius / bandCount * 0.8, 64);
-                        const bandMaterial = new THREE.MeshStandardMaterial({color: bandColor, transparent: true, opacity: 0.7, side: THREE.DoubleSide});
-                        const bandMesh = new THREE.Mesh(bandGeometry, bandMaterial);
-                        const yPosition = (i - (bandCount - 1) / 2) * (radius / bandCount * 1.1);
-                        bandMesh.position.y = yPosition;
-                        bandMesh.rotation.x = Math.PI / 2; 
-                        bandMesh.name = 'JupiterBand'; 
-                        planetMesh.add(bandMesh);
-                    }
-                    
-                    // Vết Đỏ Lớn (GRS)
-                    const grsRadius = radius * 0.2; 
-                    const spotGeometry = new THREE.PlaneGeometry(grsRadius * 1.5, grsRadius * 0.7); 
-                    const spotMaterial = new THREE.MeshStandardMaterial({ 
-                        color: 0x8b0000, 
-                        roughness: 0.9, 
-                        metalness: 0.1, 
-                        side: THREE.DoubleSide,
-                        transparent: true,
-                        opacity: 0.9
-                    });
-                    const spotMesh = new THREE.Mesh(spotGeometry, spotMaterial);
-                    const grsGroup = new THREE.Group();
-                    const latitude = -22 * (Math.PI / 180);
-                    grsGroup.rotation.x = latitude; 
-                    spotMesh.position.z = radius; 
-                    spotMesh.rotation.x = Math.PI / 2; 
-
-                    grsGroup.add(spotMesh);
-                    planetMesh.add(grsGroup);
-                    planetMesh.userData.grsGroup = grsGroup; 
-                }
-
-                // Vòng Quỹ Đạo
-                const orbitLineMaterial = new THREE.LineBasicMaterial({ color: 0x666666 }); 
-                const points = [];
-                for (let i = 0; i <= 360; i += 5) {
-                    const angle = i * Math.PI / 180;
-                    points.push(new THREE.Vector3(data.orbitRadius * Math.cos(angle), 0, data.orbitRadius * Math.sin(angle)));
-                }
-                const orbitGeometry = new THREE.BufferGeometry().setFromPoints(points);
-                const orbitLine = new THREE.Line(orbitGeometry, orbitLineMaterial);
-                orbitLine.rotation.x = Math.PI / 2; 
-                orbitGroup.add(orbitLine); 
-
-                // Vành Đai (Saturn và Uranus)
+                // Vành Đai Sao Thổ/Thiên Vương (Đã FIX)
                 if (data.hasRings) {
-                    const ringGeometry = new THREE.RingGeometry(data.size * 1.5, data.size * 2.5, 128, 1, 0, Math.PI * 2);
-                    
-                    const pos = ringGeometry.attributes.position;
-                    const v3 = new THREE.Vector3();
-                    for (let i = 0; i < pos.count; i++) {
-                        v3.fromBufferAttribute(pos, i);
-                        pos.setY(i, v3.y * 0.005); 
-                    }
-                    ringGeometry.computeVertexNormals();
+                    const ringGeometry = new THREE.RingGeometry(data.size * 1.5, data.size * 2.8, 64);
                     
                     const ringMaterial = new THREE.MeshStandardMaterial({ 
                         color: data.ringColor, 
                         side: THREE.DoubleSide, 
-                        transparent: true,
-                        opacity: 0.7, 
+                        transparent: true, 
+                        opacity: 0.9, 
                         roughness: 0.9 
                     });
+
                     const ringMesh = new THREE.Mesh(ringGeometry, ringMaterial);
                     
-                    const axialTilt = data.axialTilt || (Math.PI / 2 * 0.4); 
+                    // Thiết lập độ nghiêng trục cho Hành tinh
+                    const axialTilt = data.axialTilt || 0; 
                     planetMesh.rotation.x = axialTilt; 
                     
+                    // Xoay vòng đai 90 độ để nó nằm ngang, sau đó nghiêng theo planetMesh
                     ringMesh.rotation.x = Math.PI / 2; 
                     ringMesh.receiveShadow = true; 
                     planetMesh.add(ringMesh);
                 }
+
+                // Vòng Quỹ Đạo
+                const orbitLineMaterial = new THREE.LineBasicMaterial({ color: 0x666666, opacity: 0.3, transparent: true }); 
+                const points = [];
+                for (let i = 0; i <= 360; i += 5) {
+                    const angle = i * Math.PI / 180;
+                    // Vòng quỹ đạo nằm trên mặt phẳng XY của group quỹ đạo (đã xoay)
+                    points.push(new THREE.Vector3(data.orbitRadius * Math.cos(angle), data.orbitRadius * Math.sin(angle), 0));
+                }
+                const orbitGeometry = new THREE.BufferGeometry().setFromPoints(points);
+                const orbitLine = new THREE.Line(orbitGeometry, orbitLineMaterial);
+                orbitGroup.add(orbitLine); 
             }
 
-            // Mặt Trăng
+            // Mặt Trăng (Moon)
             if (earth) {
                 const moonOrbitRadius = 8;
                 const moonGeometry = new THREE.SphereGeometry(1, 32, 32);
@@ -465,28 +770,37 @@
                 earth.add(moon); 
             }
             
-            // 8. Event Listeners (Bộ lắng nghe sự kiện)
+            // Thiết lập các sự kiện điều khiển
             window.addEventListener('resize', onWindowResize);
-            
-            // Bộ lắng nghe cho chuột
             document.addEventListener('mousedown', onMouseDown, false);
             document.addEventListener('mouseup', onMouseUp, false);
             document.addEventListener('mousemove', onMouseMove, false);
             document.addEventListener('wheel', onMouseWheel, false);
             
-            // BỘ LẮNG NGHE CHO CẢM ỨNG (RESPONSIVE)
+            document.addEventListener('click', onPlanetClick, false); 
+            
             document.addEventListener('touchstart', onTouchStart, false);
             document.addEventListener('touchmove', onTouchMove, false);
             document.addEventListener('touchend', onTouchEnd, false);
 
-            document.getElementById('focusEarthBtn').addEventListener('click', focusOnEarth);
+            // Xử lý thanh trượt tốc độ
+            const speedSlider = document.getElementById('speedSlider');
+            const currentSpeedSpan = document.getElementById('currentSpeed');
+            speedSlider.addEventListener('input', (event) => {
+                globalSpeedMultiplier = parseFloat(event.target.value);
+                currentSpeedSpan.textContent = globalSpeedMultiplier.toFixed(1);
+            });
+            
+            document.getElementById('close-help').onclick = () => {
+                document.getElementById('help-overlay').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('help-overlay').style.display = 'none';
+                }, 500);
+            };
 
-            console.log("Khởi tạo hoàn tất. Sẵn sàng chạy animate.");
+            createPlanetList();
         }
         
-        /**
-         * Xử lý thay đổi kích thước cửa sổ (Quan trọng cho Responsive)
-         */
         function onWindowResize() {
             if (camera && renderer && composer) {
                 camera.aspect = window.innerWidth / window.innerHeight;
@@ -496,9 +810,37 @@
             }
         }
         
-        // --- Xử lý sự kiện chuột cho Camera ---
+        function onPlanetClick(event) {
+            // Loại trừ click vào UI panels
+            if (event.target.closest('#controls') || event.target.closest('#info-panel') || event.target.closest('#help-overlay')) return;
+            
+            const clientX = event.clientX || (event.changedTouches && event.changedTouches[0].clientX);
+            const clientY = event.clientY || (event.changedTouches && event.changedTouches[0].clientY);
+
+            if (!clientX || !clientY) return;
+
+            mouse.x = (clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+
+            const interactableObjects = solarSystemObjects;
+            const intersects = raycaster.intersectObjects(interactableObjects);
+            
+            if (intersects.length > 0) {
+                // Kiểm tra xem có phải là hành tinh không (loại trừ các thành phần nhỏ như chấm đỏ)
+                let clickedObject = intersects[0].object;
+                if (clickedObject.name === "HumanAnnotation") {
+                    clickedObject = clickedObject.parent; // Quay lại Trái Đất
+                }
+                focusOnObject(clickedObject);
+            } else {
+                focusOnObject(null);
+            }
+        }
         
         function onMouseDown(event) {
+            if (event.target.closest('#controls') || event.target.closest('#info-panel') || event.target.closest('#help-overlay')) return; 
             isDragging = true;
             previousMousePosition.x = event.clientX;
             previousMousePosition.y = event.clientY;
@@ -509,7 +851,7 @@
         }
 
         function onMouseMove(event) {
-            if (!isDragging) return;
+            if (!isDragging || initialPinchDistance > 0) return; 
             
             const deltaX = event.clientX - previousMousePosition.x;
             const deltaY = event.clientY - previousMousePosition.y;
@@ -526,45 +868,80 @@
         }
 
         function onMouseWheel(event) {
-            const zoomSpeed = 0.1;
-            cameraRadius += event.deltaY * zoomSpeed;
+            // Zoom thích ứng: tốc độ zoom chậm hơn khi ở gần và nhanh hơn khi ở xa
+            const adaptiveZoomSpeed = cameraRadius * 0.0015; 
+            cameraRadius += event.deltaY * adaptiveZoomSpeed;
             
-            cameraRadius = Math.max(50, Math.min(2000, cameraRadius)); 
+            const minRadius = currentFocusObject ? 3 : 50;
+            cameraRadius = Math.max(minRadius, Math.min(2000, cameraRadius)); 
             
             updateCameraPosition();
         }
-        
-        // --- Xử lý sự kiện cảm ứng (Touch) cho Camera ---
-        
+
+        function getDistance(touch1, touch2) {
+            const dx = touch1.clientX - touch2.clientX;
+            const dy = touch1.clientY - touch2.clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
         function onTouchStart(event) {
+            if (event.target.closest('#controls') || event.target.closest('#info-panel') || event.target.closest('#help-overlay')) return; 
+
             if (event.touches.length === 1) {
-                event.preventDefault(); // Ngăn chặn cuộn trang
+                event.preventDefault(); 
                 isDragging = true;
                 previousMousePosition.x = event.touches[0].clientX;
                 previousMousePosition.y = event.touches[0].clientY;
+                initialPinchDistance = 0;
+            } else if (event.touches.length === 2) {
+                event.preventDefault(); 
+                isDragging = false; 
+                initialPinchDistance = getDistance(event.touches[0], event.touches[1]);
             }
         }
 
         function onTouchMove(event) {
-            if (!isDragging || event.touches.length !== 1) return;
-            event.preventDefault(); // Ngăn chặn cuộn trang khi kéo
-            
-            const deltaX = event.touches[0].clientX - previousMousePosition.x;
-            const deltaY = event.touches[0].clientY - previousMousePosition.y;
+            if (event.touches.length === 1 && isDragging) {
+                event.preventDefault(); 
+                
+                const deltaX = event.touches[0].clientX - previousMousePosition.x;
+                const deltaY = event.touches[0].clientY - previousMousePosition.y;
 
-            const rotationSpeed = 0.007; // Tăng nhẹ tốc độ cho cảm ứng mượt hơn
+                const rotationSpeed = 0.007;
 
-            cameraAngle.horizontal -= deltaX * rotationSpeed;
-            cameraAngle.vertical += deltaY * rotationSpeed;
+                cameraAngle.horizontal -= deltaX * rotationSpeed;
+                cameraAngle.vertical += deltaY * rotationSpeed;
 
-            updateCameraPosition(); 
-            
-            previousMousePosition.x = event.touches[0].clientX;
-            previousMousePosition.y = event.touches[0].clientY;
+                updateCameraPosition(); 
+                
+                previousMousePosition.x = event.touches[0].clientX;
+                previousMousePosition.y = event.touches[0].clientY;
+
+            } else if (event.touches.length === 2 && initialPinchDistance > 0) {
+                event.preventDefault();
+
+                const currentPinchDistance = getDistance(event.touches[0], event.touches[1]);
+                const pinchDelta = currentPinchDistance - initialPinchDistance;
+
+                // Zoom thích ứng: Dùng pinchDelta và tỉ lệ bán kính hiện tại
+                const adaptiveZoomSpeed = cameraRadius * 0.003; 
+
+                cameraRadius -= pinchDelta * adaptiveZoomSpeed; 
+                
+                const minRadius = currentFocusObject ? 3 : 50;
+                cameraRadius = Math.max(minRadius, Math.min(2000, cameraRadius)); 
+                
+                updateCameraPosition();
+                
+                initialPinchDistance = currentPinchDistance; 
+            }
         }
 
         function onTouchEnd(event) {
             isDragging = false;
+            if (event.touches.length < 2) { 
+                initialPinchDistance = 0;
+            }
         }
 
 
@@ -579,63 +956,88 @@
             }
             
             const deltaTime = clock.getDelta(); 
+            const effectiveDeltaTime = deltaTime * globalSpeedMultiplier;
 
-            // Cập nhật chuyển động cho tất cả vật thể
+            // 1. Cập nhật vị trí hành tinh và các vật thể
             for (const object of solarSystemObjects) {
                 const data = object.userData;
 
-                // Tự quay tại chỗ
                 if (data.selfRotateSpeed) {
-                    object.rotation.y += data.selfRotateSpeed * deltaTime;
+                    object.rotation.y += data.selfRotateSpeed * effectiveDeltaTime;
                 }
 
-                // Quay quanh quỹ đạo
                 if (object.parent instanceof THREE.Group && object.parent.userData.orbitSpeed) {
-                    object.parent.rotation.y += object.parent.userData.orbitSpeed * deltaTime;
-                }
-                
-                // Xoay độc lập GRS của Sao Mộc
-                if (data.name === 'Jupiter' && data.grsGroup) {
-                    data.grsGroup.rotation.y += (data.selfRotateSpeed * 0.97) * deltaTime; 
+                    object.parent.rotation.y += object.parent.userData.orbitSpeed * effectiveDeltaTime;
                 }
             }
             
-            // Xoay lớp mây Trái Đất
             if (earthClouds) {
-                earthClouds.rotation.y += 0.05 * deltaTime; 
+                earthClouds.rotation.y += 0.05 * effectiveDeltaTime; 
             }
 
-            // Xử lý chuyển động của Vành đai Tiểu hành tinh
             if (asteroids && asteroids.userData.orbitSpeed) {
-                asteroids.rotation.y += asteroids.userData.orbitSpeed * deltaTime;
+                asteroids.rotation.y += asteroids.userData.orbitSpeed * effectiveDeltaTime;
             }
 
-            // Xử lý chuyển động của Mặt Trăng (quay quanh Trái Đất)
             if (moon) {
-                const elapsedTime = clock.getElapsedTime();
-                const moonSpeed = 2; 
+                const moonSpeed = 2 * INITIAL_SPEED_FACTOR; 
                 const moonRadius = 8;
+                const moonGroupRotation = effectiveDeltaTime * moonSpeed;
                 
-                moon.position.z = moonRadius * Math.sin(elapsedTime * moonSpeed);
-                moon.position.x = moonRadius * Math.cos(elapsedTime * moonSpeed);
+                // Moon quay quanh Trái Đất
+                const moonOrbitGroup = new THREE.Group();
+                moonOrbitGroup.rotation.y = moonGroupRotation;
+                
+                moon.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), moonGroupRotation);
+                moon.rotation.y += 0.1 * effectiveDeltaTime;
             }
             
-            // Chuyển động camera mượt mà về mục tiêu (khi không kéo chuột)
-            if (!isDragging) {
-                camera.lookAt(camera.position.clone().lerp(focusTarget, 0.002 * deltaTime * 60)); 
+            // 2. Cập nhật mục tiêu focus và Camera
+            if (currentFocusObject) {
+                const targetPosition = new THREE.Vector3();
+                currentFocusObject.getWorldPosition(targetPosition);
+                
+                // Sử dụng lerp để chuyển động camera mượt mà
+                focusTarget.lerp(targetPosition, 0.1); 
             }
 
-            // Render bằng Composer để áp dụng hiệu ứng Bloom
+            if (!isDragging && initialPinchDistance === 0) {
+                updateCameraPosition();
+            }
+            
+            // 3. Cập nhật thông tin khoảng cách theo thời gian thực (NEW)
+            if (currentFocusObject && currentFocusObject.userData.name !== 'Sun') {
+                const infoDistance = document.getElementById('info-distance');
+                
+                const currentPos = new THREE.Vector3();
+                currentFocusObject.getWorldPosition(currentPos);
+                
+                // Khoảng cách từ vị trí hiện tại đến Mặt Trời (0,0,0)
+                const distance = currentPos.length(); 
+                
+                if (infoDistance) {
+                    infoDistance.textContent = `${distance.toFixed(2)} AU (mô phỏng)`;
+                }
+            }
+
+            // Render
             composer.render();
         }
 
-        // Đảm bảo `init` được gọi trước khi `animate` bắt đầu
+        // Khởi động ứng dụng
         window.onload = function () {
             try {
                 init();
                 animate();
             } catch (error) {
                 console.error("Lỗi trong quá trình khởi tạo hoặc hoạt hình:", error);
+                // Hiển thị thông báo lỗi thân thiện nếu không thể khởi tạo
+                document.body.innerHTML = `
+                    <div class="p-8 text-center text-red-500 bg-gray-900 absolute inset-0 flex items-center justify-center flex-col">
+                        <h1 class="text-3xl font-bold mb-4">Lỗi Khởi tạo 3D</h1>
+                        <p class="text-lg">Có vẻ như trình duyệt của bạn gặp sự cố khi chạy mô phỏng 3D. Vui lòng kiểm tra console hoặc thử lại.</p>
+                        <p class="text-sm mt-3">Chi tiết lỗi: ${error.message}</p>
+                    </div>`;
             }
         }
     </script>
